@@ -1,0 +1,9 @@
+[General]
+ocrLanguages=afr
+
+[ImageSave]
+lastImageSaveLocation=file:///home/live/Pictures/Screenshots
+translatedScreenshotsFolder=Screenshots
+
+[VideoSave]
+translatedScreencastsFolder=Screencasts

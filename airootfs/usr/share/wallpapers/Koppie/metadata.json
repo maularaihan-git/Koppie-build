@@ -1,0 +1,18 @@
+{
+    "KPlugin": {
+        "Authors": [
+            {
+                "Email": "",
+                "Name": "Maula Raihan"
+            }
+        ],
+        "Description": "Koppie Linux default wallpaper",
+        "Description[id]": "Wallpaper bawaan Koppie Linux",
+        "EnabledByDefault": true,
+        "Id": "Koppie",
+        "License": "CC-BY-SA-4.0",
+        "Name": "Koppie",
+        "Name[id]": "Koppie",
+        "Version": "1.0"
+    }
+}

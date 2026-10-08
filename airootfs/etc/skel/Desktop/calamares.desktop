@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Install Koppie Linux
+GenericName=System Installer
+Keywords=calamares;system;installer;
+TryExec=calamares
+Exec=pkexec calamares
+Comment=Install Koppie Linux to your system
+Icon=calamares
+Terminal=false
+StartupNotify=true
+Categories=Qt;System;

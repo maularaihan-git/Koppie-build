@@ -1,0 +1,26 @@
+#!/bin/bash
+# Koppie Linux - buat live user di boot pertama (sebelum SDDM).
+# Password cadangan: koppie (dipakai kalau autologin gagal / sudo minta password)
+# Password root live juga: koppie (fallback rescue di TTY)
+if id live &>/dev/null; then
+    systemctl disable koppie-live-user.service
+    exit 0
+fi
+# Bikin grup dulu kalau belum ada (useradd GAGAL kalau 1 grup aja missing = live user nggak jadi = SDDM item)
+for g in wheel audio video optical storage power network lp scanner users; do
+    getent group "$g" >/dev/null || groupadd -r "$g"
+done
+useradd -m -G wheel,audio,video,optical,storage,power,network,lp,scanner -s /bin/bash live
+echo "live:koppie" | chpasswd
+echo "root:koppie" | chpasswd
+cp -a /etc/skel/. /home/live/
+chown -R live:live /home/live
+chmod 700 /home/live
+# Auto-trust launcher desktop (biar nggak ada dialog "trust", langsung jalan).
+# Best-effort: kalau gio gagal, user tinggal klik Continue sekali (fallback aman).
+if [ -f /home/live/Desktop/calamares.desktop ]; then
+    chmod +x /home/live/Desktop/calamares.desktop
+    chown live:live /home/live/Desktop/calamares.desktop
+    sudo -u live gio set /home/live/Desktop/calamares.desktop metadata::trusted true 2>/dev/null || true
+fi
+systemctl disable koppie-live-user.service

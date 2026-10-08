@@ -1,0 +1,12 @@
+[Unit]
+Description=Koppie Linux live user setup (first boot only)
+Before=sddm.service
+After=local-fs.target
+ConditionPathExists=!/home/live
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/koppie-live-user
+
+[Install]
+WantedBy=multi-user.target
