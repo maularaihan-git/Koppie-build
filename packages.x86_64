@@ -95,6 +95,12 @@ polkit
 calamares
 calamares-config-koppie
 squashfs-tools
+gptfdisk
+dbus
+parted
+arch-install-scripts
+util-linux
+rsync
 dosfstools
 mtools
 exfatprogs
