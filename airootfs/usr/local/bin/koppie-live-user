@@ -24,3 +24,8 @@ if [ -f /home/live/Desktop/calamares.desktop ]; then
     sudo -u live gio set /home/live/Desktop/calamares.desktop metadata::trusted true 2>/dev/null || true
 fi
 systemctl disable koppie-live-user.service
+# Backup vmlinuz ke RAM kalau boot copytoram (biar install tetap jalan
+# meski USB dicabut: unpackfs butuh file ini dari bootmnt).
+if [ -e /run/archiso/copytoram/airootfs.sfs ] && [ -e /run/archiso/bootmnt/koppie/boot/x86_64/vmlinuz-linux-lts ]; then
+    cp /run/archiso/bootmnt/koppie/boot/x86_64/vmlinuz-linux-lts /run/archiso/copytoram/vmlinuz-linux-lts 2>/dev/null || true
+fi
