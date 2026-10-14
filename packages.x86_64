@@ -3,6 +3,7 @@ linux-lts
 linux-lts-headers
 mkinitcpio
 mkinitcpio-archiso
+koppie-archiso-hookfix
 grub
 syslinux
 efibootmgr
