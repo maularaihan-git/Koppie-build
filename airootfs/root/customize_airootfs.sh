@@ -36,3 +36,14 @@ for f in /usr/share/wallpapers/Next/contents/images/*.png /usr/share/wallpapers/
 done
 sed -i 's|^background=.*|background=/usr/share/wallpapers/Koppie/contents/Images_dark/5120x2880.png|' \
     /usr/share/sddm/themes/breeze/theme.conf
+
+# 6. Patch hook archiso: stash vmlinuz ke RAM saat copytoram (biar install
+#    tetap jalan meski USB dicabut; squashfs sudah di-copy hook aslinya,
+#    kernel belum). Idempoten (cek marker dulu).
+HOOK=/usr/lib/initcpio/hooks/archiso
+if [ -f "$HOOK" ] && ! grep -q 'Koppie-stash-kernel' "$HOOK"; then
+    sed -i '/^        msg "done\."$/a\
+        # Koppie-stash-kernel: simpan vmlinuz ke RAM saat copytoram\
+        _koppie_kimg="/run/archiso/bootmnt/${archisobasedir}\/${arch}\/vmlinuz-linux-lts"\
+        if [ -e "${_koppie_kimg}" ]; then cp -- "${_koppie_kimg}" "/run/archiso/copytoram/vmlinuz-linux-lts" 2>\/dev\/null || true; fi' "$HOOK"
+fi

@@ -1,0 +1,38 @@
+# Koppe Linux Manual - Rencana Build MANUAL (arsip ide, BUKAN aktif)
+Tanggal catat: 2026-10-13 (fokus: proses MANUAL, bukan Arch - desktop tetap KDE)
+Status: wacana masa depan. Jalur aktif tetap archiso (lihat repo Koppie-build).
+
+## Fokus
+- Yang diganti: PROSES BUILD-nya saja (manual: skrip mksquashfs + xorriso
+  + alat manual lain, tanpa mkarchiso).
+- Yang TETAP: KDE Plasma + panel + wallpaper Koppie (desktop stack tidak berubah,
+  cuma cara bungkus ISO-nya yang manual).
+
+## Ide
+- Distro INDEPENDEN MURNI, BUKAN turunan distro/apapun (bukan turunan Arch,
+  Debian, atau apapun; rolling release stabil ATAU rolling release unstable
+  tetap independen — bukan turunan).
+- Skrip build baru dari nol (mksquashfs + xorriso
+  dipakai langsung, BUKAN lewat mkarchiso / debian-lb / tool distro lain).
+- Paket: nix + repo kustom (koppiepkg). Flatpak belakangan (butuh
+  systemd/dbus/portals yang mateng dulu).
+- Repo kustom isi: calamares + aplikasi yang tidak ada di nix/flatpak/di mana pun.
+- Rilis: rolling (mendekati stable).
+
+## Catatan jujur (wajib baca sebelum mulai)
+1. mksquashfs + xorriso itu DUA TOOL dalam pipa archiso.
+   archiso sendiri sudah memanggil keduanya. Menulis skrip sendiri
+   = menulis ulang backend archiso, minus ribuan jam testing-nya.
+2. Yang tetap harus dibangun manual (tidak disediakan dua tool itu):
+   - initramfs + hook live-boot (mount squashfs, overlay/cow, copytoram),
+   - bootloader BIOS (syslinux) + UEFI (GRUB) + ESP,
+   - pacstrap root yang bersih + reproducible,
+   - checksum, label/UUID, secure-boot (kalau mau).
+3. Lebih mudah dari Buildroot/Yocto? Untuk distro desktop Arch: YA, sedikit.
+   Lebih mudah dari archiso? TIDAK. archiso = skrip itu + testing + hooks.
+4. Prasyarat: Koppie-archiso STABIL + rilis dulu, tim minimal 2-3 orang,
+   dan alasan kuat (misal butuh layout ISO yang archiso tidak dukung).
+
+## Kapan dibuka lagi
+- Kalau ada kebutuhan konkret yang mentok di archiso (tulis di sini apa).
+- Sampai saat itu: JANGAN. Fokus: archiso + Calamares + KDM.
