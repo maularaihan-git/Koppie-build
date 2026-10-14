@@ -9,11 +9,12 @@ Status: wacana masa depan. Jalur aktif tetap archiso (lihat repo Koppie-build).
   cuma cara bungkus ISO-nya yang manual).
 
 ## Ide
-- Distro INDEPENDEN MURNI, BUKAN turunan distro/apapun (bukan turunan Arch,
-  Debian, atau apapun; rolling release stabil ATAU rolling release unstable
-  tetap independen — bukan turunan).
-- Skrip build baru dari nol (mksquashfs + xorriso
-  dipakai langsung, BUKAN lewat mkarchiso / debian-lb / tool distro lain).
+- Distro INDEPENDEN MURNI, BUKAN LFS, BUKAN turunan distro/apapun (bukan
+  turunan Arch, Debian, openSUSE, Void, Fedora, dll; rolling release stabil
+  ATAU rolling release unstable tetap independen — bukan turunan).
+- Cara: skrip build baru dari nol pakai mksquashfs + xorriso + alat lain
+  yang bisa bikin skrip distro independen (TANPA lewat mkarchiso /
+  debian-lb / tool distro lain).
 - Paket: nix + repo kustom (koppiepkg). Flatpak belakangan (butuh
   systemd/dbus/portals yang mateng dulu).
 - Repo kustom isi: calamares + aplikasi yang tidak ada di nix/flatpak/di mana pun.
