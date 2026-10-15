@@ -1,0 +1,5 @@
+# Artefak build (jangan di-commit - lihat BUILD.md)
+out/
+work/
+build-*.log
+*.log
