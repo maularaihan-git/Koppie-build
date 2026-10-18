@@ -346,16 +346,41 @@ pacman -Q linux-lts linux-lts-headers # versi yang kepasang
 
 ### H. OS lain gak muncul di menu GRUB (dualboot, setelah install selesai)
 
-**PENTING — baca dulu sebelum nyalain os-prober**:
+**AKAR MASALAH SEBENARNYA (sudah terbukti di mesin asli):**
 
-Di Koppie, os-prober **udah aktif dari sononya**. Faktanya dari ISO:
+GRUB 2.16 **menge-hardcode `GRUB_DISABLE_OS_PROBER="true"`** di dalam
+`/usr/sbin/grub-mkconfig`. Jadi walau paket `os-prober` kepasang, dia **gak
+pernah jalan** — KECUALI baris `GRUB_DISABLE_OS_PROBER=false` di
+`/etc/default/grub` ke-**uncomment**.
 
-| Komponen | Status di Koppie |
+| Komponen | Kenyataan |
 |---|---|
-| `os-prober` | udah terpasang (`packages.x86_64`) |
-| `GRUB_DISABLE_OS_PROBER` | udah ditulis `"false"` sama modul `grubcfg` Calamares |
+| `os-prober` | terpasang, dan BISA detek OS lain (tapi lambat >60 dtk) |
+| `GRUB_DISABLE_OS_PROBER` | **tetap `"true"`** (hardcode GRUB 2.16) |
+| `grubcfg` Calamares | **GAK nulis** baris ini — cuma nulis `GRUB_DISTRIBUTOR` |
 
-Jadi **"GRUB modern nge-disable os-prober" NGGAK berlaku di sini**. Kalau OS kedua tetap gak nongol, masalahnya BUKAN os-prober mati. Cek dua hal ini dulu:
+> **Koreksi doc lama**: bagian 6 sempat nge-klaim "grubcfg nulis
+> `GRUB_DISABLE_OS_PROBER=false`" — itu **SALAH**, kebukti gak ngefek di mesin.
+
+Fix-nya (sudah kebake di ISO via `customize_airootfs.sh`, tapi kalau di mesin
+yang udah ke-install lama, jalanin manual):
+
+```bash
+# 1. Uncomment (JANGAN append — biar gak dobel)
+sudo sed -i 's|^#GRUB_DISABLE_OS_PROBER=false|GRUB_DISABLE_OS_PROBER=false|' /etc/default/grub
+#    kalau barisnya gak ada sama sekali:
+grep -q '^GRUB_DISABLE_OS_PROBER=false' /etc/default/grub \
+  || echo 'GRUB_DISABLE_OS_PROBER=false' | sudo tee -a /etc/default/grub
+
+# 2. Regenerate menu (kasih waktu — os-prober LAMBAT di hardware lama)
+sudo timeout 300 grub-mkconfig -o /boot/grub/grub.cfg
+#    harus muncul: "Found <OS> on /dev/sdXN"
+```
+
+Atau tinggal `sudo koppie-doctor grub` (udah handle uncomment + timeout).
+
+**Dua hal LAIN yang tetap perlu dicek** (kalau fix di atas udah jalan tapi OS
+tetap gak nongol):
 
 **Kemungkinan 1 — yang keboot GRUB-nya OS kedua, bukan Koppie.**
 
@@ -370,20 +395,15 @@ efibootmgr -v          # bootloader mana yang jadi default?
 **Kemungkinan 2 — grub-mkconfig terakhir jalan dari OS LAIN** (os-prober-nya masih default/off di sana), jadi `/boot/grub/grub.cfg` kepenuhan config OS itu dan entry Koppie/OS lain ilang. Fix-nya: **regenerate dari Koppie** (partition yang megang GRUB).
 
 ```bash
-# dari Koppie, root mount di /
-grep -n GRUB_DISABLE_OS_PROBER /etc/default/grub
-# harusnya udah "false". Kalau belum, tambahin SEKALI (idempoten):
-grep -q '^GRUB_DISABLE_OS_PROBER=false' /etc/default/grub \
-  || echo 'GRUB_DISABLE_OS_PROBER=false' | sudo tee -a /etc/default/grub
+# pastiin os-prober udah aktif (uncomment, sama kayak fix utama di atas)
+sudo sed -i 's|^#GRUB_DISABLE_OS_PROBER=false|GRUB_DISABLE_OS_PROBER=false|' /etc/default/grub
 
-sudo os-prober                  # tes deteksi — harusnya muncul daftar OS lain
-sudo grub-mkconfig -o /boot/grub/grub.cfg
+sudo timeout 300 os-prober            # tes deteksi — harusnya muncul daftar OS lain
+sudo timeout 300 grub-mkconfig -o /boot/grub/grub.cfg
 grep -n menuentry /boot/grub/grub.cfg | head   # entry OS lain harus kecantum
 ```
 
-**Kalau `os-prober` kosong tapi OS-nya emang ada**: partisi OS lain gak ke-mount waktu `grub-mkconfig` jalan. Mount manual dulu (`sudo mount /dev/sdXY /mnt/os`), ulangi dari atas.
-
-> `echo ... | tee -a` bisa nambah baris dobel kalau dijalankan 2x — makanya dibungkus `grep -q ... ||` biar cuma nulis kalau belum ada.
+**Kalau `os-prober` kosong tapi OS-nya emang ada**: kemungkinan os-prober kecepetan (hardware lama butuh >60 dtk) — coba `sudo timeout 300 os-prober` manual. Atau partisi OS lain gak ke-mount waktu `grub-mkconfig` jalan. Mount manual dulu (`sudo mount /dev/sdXY /mnt/os`), ulangi dari atas.
 
 ---
 
@@ -435,9 +455,16 @@ grub timeout           600 dtk, kebaca di dalam sfs
 baloo fix              /etc/systemd/user/kde-baloo.service.d/override.conf
                        Environment=QT_QPA_PLATFORM=offscreen  (identik dgn host, crash 3,3/dtk → 0)
 plasma-welcome         6.8.0-1 + kded_plasma_welcome.so terpasang
-os-prober              1.85-1 terpasang; grub 2.16 blokir HANYA kalau == "true"
-grubcfg                nulis GRUB_DISABLE_OS_PROBER="false", GRUB_TIMEOUT=10,
-                       GRUB_DISTRIBUTOR="Koppie Linux" ke /etc/default/grub target
+os-prober              1.85-1 terpasang; tapi GRUB 2.16 MENGE-HARDCODE
+                       GRUB_DISABLE_OS_PROBER="true" di /usr/sbin/grub-mkconfig
+                       -> os-prober GAK jalan walau paket ada, KECUALI baris
+                       GRUB_DISABLE_OS_PROBER=false di /etc/default/grub ke-uncomment
+grubcfg                NOL besar (SALAH kalau doc lama bilang dia nulis
+                       GRUB_DISABLE_OS_PROBER). Kenyataan di mesin asli:
+                       grubcfg CUMA nulis GRUB_DISTRIBUTOR, sedangkan
+                       GRUB_TIMEOUT tetap 5 & GRUB_DISABLE_OS_PROBER tetap
+                       ke-COMMENT. FIX: uncomment di customize_airootfs.sh
+                       (commit "fix(dualboot): bake aktifkan os-prober")
 urutan modul           bootloader → grubcfg → shellprocess(grub-mkconfig)
                        = config ke-enable SEBELUM grub-mkconfig jalan
 ntfs-3g                ada → partisi Windows ke-detek
