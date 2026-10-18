@@ -27,4 +27,5 @@ file_permissions=(
   ["/usr/local/bin/Installation_guide"]="0:0:755"
   ["/usr/local/bin/livecd-sound"]="0:0:755"
   ["/usr/local/bin/koppie-live-user"]="0:0:755"
+  ["/usr/local/bin/koppie-doctor"]="0:0:755"
 )

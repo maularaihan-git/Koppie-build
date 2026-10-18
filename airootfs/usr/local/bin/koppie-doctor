@@ -1,0 +1,211 @@
+#!/bin/bash
+# Koppie Doctor — perbaikan otomatis 1 perintah buat masalah umum Koppie Linux.
+# Dipanggil: koppie-doctor            (menu interaktif)
+#            koppie-doctor <fitur>   (langsung, buat script/otomatis)
+#
+# Fitur:
+#   lock    — beresin "unable to lock database" pacman (AMAN, gak asal hapus)
+#   grub    — deteksi ulang OS lain + regen menu GRUB (dualboot)
+#   wifi    — cek driver WiFi DKMS (broadcom) & status build-nya
+#   all     — jalankan semua pemeriksaan + perbaikan di atas
+#
+# Filosofi: semua perbaikan DIJALANKAN USER saat butuh (ketik 1 perintah),
+# bukan auto-jalan di background. Hapus lock sembarangan bisa korupsi DB
+# kalau ada pacman beneran lagi jalan — jadi dicek dulu baru diberesin.
+
+set -u
+
+RED=$'\e[31m'; GRN=$'\e[32m'; YLW=$'\e[33m'; CYN=$'\e[36m'; BLD=$'\e[1m'; RST=$'\e[0m'
+
+say()  { echo "${CYN}[koppie-doctor]${RST} $1"; }
+ok()   { echo "${GRN}  [OK]${RST}   $1"; }
+warn() { echo "${YLW}  [!]${RST}    $1"; }
+bad()  { echo "${RED}  [X]${RST}    $1"; }
+need_root() {
+    if [ "$(id -u)" -ne 0 ]; then
+        bad "Fitur ini butuh root. Jalankan: sudo koppie-doctor $1"
+        exit 1
+    fi
+}
+
+# ---------------------------------------------------------------- lock
+# Beresin db.lck yang menggantung. AMAN: bunuh proses dulu, dan TIDAK
+# menghapus lock kalau masih ada proses pacman hidup yang belum mau mati.
+fix_lock() {
+    say "Cek lock database pacman..."
+    local lock="/var/lib/pacman/db.lck"
+    local pamac_lock="/var/tmp/pamac/dbs/db.lck"
+
+    if [ ! -f "$lock" ]; then
+        ok "Gak ada lock ($lock gak ada). Pacman seharusnya normal."
+        return 0
+    fi
+
+    # Ada proses pacman yang BENERAN jalan? Kalau iya, jangan dipaksa.
+    if pgrep -x pacman >/dev/null 2>&1; then
+        warn "Masih ada proses pacman yang jalan:"
+        ps -o pid,etimes,comm -C pacman
+        echo
+        read -r -p "  Yakin mau dibunuh? (iya/tidak) " jawab
+        if [ "$jawab" = "iya" ]; then
+            sudo killall pacman 2>/dev/null
+            sleep 2
+            pgrep -x pacman >/dev/null 2>&1 && sudo killall -9 pacman 2>/dev/null
+            ok "Proses pacman dibunuh."
+        else
+            bad "Dibatalkan. Kalau emang lagi proses besar, tunggu sampai kelar."
+            return 1
+        fi
+    else
+        ok "Gak ada proses pacman hidup — lock ini sisa (dari proses yang putus)."
+    fi
+
+    # Baru aman hapus lock.
+    sudo rm -f "$lock" "$pamac_lock"
+    ok "Lock dihapus: $lock"
+
+    say "Bersihkan cache DB korup + sinkronisasi ulang..."
+    sudo rm -f /var/lib/pacman/sync/*
+    if sudo pacman -Syuu; then
+        ok "Pacman normal lagi. Selesai."
+    else
+        bad "pacman -Syuu masih gagal — cek output di atas."
+        return 1
+    fi
+}
+
+# ---------------------------------------------------------------- grub
+# OS lain gak muncul di menu GRUB. Di Koppie os-prober UDAH aktif, jadi
+# biasanya tinggal regen grub.cfg dari partisi Koppie.
+fix_grub() {
+    say "Cek setup GRUB (dualboot)..."
+
+    if [ ! -d /boot/grub ] && [ ! -d /boot/efi ]; then
+        warn "Gak ketemu instalasi GRUB di /boot. Fitur ini buat sistem yang SUDAH ke-install."
+        return 1
+    fi
+
+    # 1. os-prober kepasang?
+    if command -v os-prober >/dev/null 2>&1; then
+        ok "os-prober terpasang."
+    else
+        warn "os-prober belum ada — install dulu: sudo pacman -S os-prober"
+    fi
+
+    # 2. Pastikan os-prober aktif (idempoten — gak nulis dobel).
+    if grep -q '^GRUB_DISABLE_OS_PROBER=false' /etc/default/grub 2>/dev/null; then
+        ok "GRUB_DISABLE_OS_PROBER=false udah aktif."
+    else
+        say "Aktifkan os-prober di /etc/default/grub..."
+        echo 'GRUB_DISABLE_OS_PROBER=false' | sudo tee -a /etc/default/grub >/dev/null
+        ok "Diaktifkan."
+    fi
+
+    # 3. Tes deteksi OS lain.
+    say "Jalanin os-prober (bisa agak lama)..."
+    local hasil
+    hasil=$(sudo os-prober 2>/dev/null)
+    if [ -n "$hasil" ]; then
+        ok "OS lain ke-detek:"
+        echo "$hasil" | sed 's/^/        /'
+    else
+        warn "Gak ada OS lain ke-detek. Kalau yakin harusnya ada:"
+        warn "  - pastiin partisi OS itu ke-mount, lalu ulangi"
+        warn "  - atau cek 'efibootmgr -v' (boot order ke Koppie apa enggak)"
+    fi
+
+    # 4. Regenerate menu GRUB.
+    say "Regenerate /boot/grub/grub.cfg..."
+    if sudo grub-mkconfig -o /boot/grub/grub.cfg; then
+        ok "Menu GRUB ke-regenerate."
+        say "Menuentry yang ada:"
+        grep -oE 'menuentry .*' /boot/grub/grub.cfg 2>/dev/null | sed 's/^/        /' | head -20
+        ok "Selesai. REBOOT biar kelihatan menunya."
+    else
+        bad "grub-mkconfig gagal — cek output di atas."
+        return 1
+    fi
+}
+
+# ---------------------------------------------------------------- wifi
+# Cek driver WiFi DKMS (broadcom). Gak "memperbaiki" apa-apa — cuma
+# diagnostik + kasih tau perintah yang tepat sesuai statusnya.
+fix_wifi() {
+    say "Cek driver WiFi (DKMS)..."
+
+    if ! command -v dkms >/dev/null 2>&1; then
+        warn "dkms belum kepasang. Kalau WiFi broadcom, install: sudo pacman -S dkms broadcom-wl-dkms"
+        return 1
+    fi
+
+    say "Status DKMS:"
+    dkms status 2>/dev/null | sed 's/^/        /' || warn "  (gak ada modul DKMS terdaftar)"
+
+    # Modul wl ke-load gak?
+    if lsmod 2>/dev/null | grep -q '^wl\b'; then
+        ok "Modul 'wl' (broadcom) SEDANG aktif."
+    else
+        warn "Modul 'wl' gak aktif. Kalau WiFi broadcom mati, coba:"
+        warn "  sudo modprobe wl"
+    fi
+
+    # Headers cocok gak sama kernel aktif?
+    local aktif headers
+    aktif=$(uname -r)
+    if pacman -Q linux-lts-headers >/dev/null 2>&1; then
+        headers=$(pacman -Q linux-lts-headers | awk '{print $2}')
+        ok "Kernel aktif: $aktif | linux-lts-headers: $headers"
+        if [ "${aktif%%-*}" != "${headers%%-[0-9]*}" ]; then
+            warn "Versi kernel & headers beda — driver DKMS bisa gagal build."
+            warn "Samain dulu: sudo pacman -Syu"
+        fi
+    else
+        warn "linux-lts-headers gak ada. Untuk DKMS: sudo pacman -Syu linux-lts-headers"
+    fi
+
+    say "Kalau WiFi masih mati: 'sudo dkms autoinstall' lalu REBOOT."
+}
+
+# ---------------------------------------------------------------- menu
+usage() {
+    cat <<EOF
+${BLD}Koppie Doctor${RST} — perbaikan masalah umum Koppie Linux
+
+Pakai: ${BLD}koppie-doctor${RST}              menu interaktif
+       ${BLD}koppie-doctor lock${RST}        beresin 'unable to lock database'
+       ${BLD}koppie-doctor grub${RST}        deteksi ulang OS lain + regen menu GRUB
+       ${BLD}koppie-doctor wifi${RST}        cek driver WiFi DKMS (broadcom)
+       ${BLD}koppie-doctor all${RST}         jalankan semua di atas
+       ${BLD}koppie-doctor -h | --help${RST}  bantuan ini
+EOF
+}
+
+menu() {
+    echo
+    echo "${BLD}${CYN}=== Koppie Doctor ===${RST}"
+    echo " 1) Beresin pacman lock   (error 'unable to lock database')"
+    echo " 2) Perbaiki menu GRUB    (OS lain gak muncul / dualboot)"
+    echo " 3) Cek driver WiFi       (broadcom / DKMS)"
+    echo " 4) Jalankan SEMUANYA"
+    echo " q) Keluar"
+    echo
+    read -r -p "Pilih [1-4/q]: " pilih
+    case "$pilih" in
+        1) fix_lock ;;
+        2) fix_grub ;;
+        3) fix_wifi ;;
+        4) fix_lock; echo; fix_grub; echo; fix_wifi ;;
+        q|Q) echo "Sampai jumpa."; exit 0 ;;
+        *) bad "Pilihan gak dikenal."; exit 1 ;;
+    esac
+}
+
+case "${1:-}" in
+    lock) need_root lock; fix_lock ;;
+    grub) need_root grub; fix_grub ;;
+    wifi) fix_wifi ;;
+    all)  need_root all; fix_lock; echo; fix_grub; echo; fix_wifi ;;
+    -h|--help|help) usage ;;
+    "")   menu ;;
+    *)    bad "Fitur '$1' gak dikenal."; usage; exit 1 ;;
+esac

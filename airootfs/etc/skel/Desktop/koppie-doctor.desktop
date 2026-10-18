@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Koppie Doctor
+GenericName=System Repair Tool
+Keywords=koppie;doctor;fix;repair;pacman;grub;wifi;dualboot;
+TryExec=koppie-doctor
+Exec=konsole -e sudo koppie-doctor
+Comment=Perbaiki masalah umum: pacman lock, menu GRUB dualboot, driver WiFi
+Icon=tools-report-bug
+Terminal=false
+StartupNotify=true
+Categories=Qt;System;
