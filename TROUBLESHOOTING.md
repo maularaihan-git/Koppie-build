@@ -425,8 +425,11 @@ Timeout per perintah di `shellprocess.conf`:
 
 ```
 verify-iso.sh          29 OK / 0 FAIL / 0 WARN
-sha512 ISO             4c5459d373b6d7b09a37076f4c061c3e00190f0ae388a4ca9c560465a1d69e1
-                       06fe7ba5548f79c8d42018f18e3e54118883830f721ebaff3149c3bec6e2f6c13
+sha512 ISO             JANGAN percaya hash yang di-hardcode di doc ini —
+                       tiap build ISO-nya beda (timestamp/kompresi), jadi
+                       hash statis PASTI basi. Ambil hash ASLI dari build lo:
+                         ./verify-iso.sh          # baris "SHA512 :"
+                         sha512sum out/*.iso      # atau manual
 burn ke flashdisk      byte-for-byte IDENTIK, MBR 55aa
 grub timeout           600 dtk, kebaca di dalam sfs
 baloo fix              /etc/systemd/user/kde-baloo.service.d/override.conf
