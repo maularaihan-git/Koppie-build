@@ -25,7 +25,6 @@ usbutils
 lshw
 plasma-desktop
 kwin
-kwin-x11
 kwayland
 kscreen
 plasma-nm
