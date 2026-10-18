@@ -280,6 +280,113 @@ sudo reboot
 
 ---
 
+## 3b. Setelah install KELAR — 3 masalah pasca-install
+
+Tiga skenario ini muncul **di sistem yang udah ke-install** (bukan di live), jadi jalankan semuanya dari Konsole di sistem terinstall.
+
+### F. `pacman` gagal — `unable to lock database`
+
+**Penyebab**: `/var/lib/pacman/db.lck` tertinggal karena proses pacman sebelumnya putus mendadak (laptop mati, internet putus, di-cancel paksa).
+
+**KUNCI urutannya**: bunuh prosesnya **DULU**, baru hapus lock-nya. Kebalikan = lock bisa ke-create ulang.
+
+```bash
+# 1. Bunuh semua sisa proses pacman (DULU, biar lock-nya nggak dibuat lagi)
+sudo killall pacman 2>/dev/null
+
+# 2. Baru hapus lock yang menggantung
+sudo rm -f /var/lib/pacman/db.lck
+
+# 3. Bersihkan cache DB yang korup, lalu sinkronisasi ulang
+sudo rm -f /var/lib/pacman/sync/*
+sudo pacman -Syuu
+```
+
+> **Note**: Koppie **tidak memakai pamac**, jadi step "hapus lock pamac" tidak diperlukan di sini. Kalau `killall` bilang `no process found`, itu normal — lock-nya emang sisa file, bukan proses hidup.
+
+---
+
+### G. WiFi Broadcom mati (driver DKMS gagal build)
+
+**Penyebab**: `broadcom-wl-dkms` (pakai **AUR**, bukan official repo) butuh `linux-lts-headers` yang **versinya persis sama** dengan kernel aktif. Kalau kernel ke-upgrade tapi headers nggak (atau kernel diganti ke non-LTS lalu balik lagi), driver gagal dikompilasi ulang oleh dkms.
+
+> ISO Koppie **udah nyertakan** `linux-lts-headers` + `dkms`. Headers bisa hilang kalau sempat ke-uninstall waktu upgrade — makanya perintah di bawah aman dijalankan kapan pun.
+
+**Butuh internet via USB tethering HP** (WiFi-kan lagi mati):
+
+```bash
+# 1. Sinkronkan + upgrade sekalian, BUKAN -Syy doang
+#    (-Syy tanpa -u itu rawan "partial upgrade" di Arch)
+sudo pacman -Syu linux-lts-headers
+
+# 2. Lihat status driver (harusnya "broadcom-wl" terdaftar + status build)
+dkms status
+
+# 3. Kompilasi ulang semua modul DKMS ke kernel yang kepasang
+sudo dkms autoinstall
+
+# 4. Cek lagi — status harusnya "installed", BUKAN "broken"
+dkms status
+
+# 5. Muat driver + restart jaringan + REBOOT
+sudo modprobe wl
+sudo systemctl restart NetworkManager
+sudo reboot
+```
+
+**Kalau `dkms status` masih "broken"**: `linux-lts-headers` versinya belum tentu sama dengan `uname -r`. Cocokkan dulu:
+
+```bash
+uname -r                              # versi kernel AKTIF, ex: 6.6.x-lts
+pacman -Q linux-lts linux-lts-headers # versi yang kepasang
+# kalau beda: sudo pacman -Syu   (samain semua dulu, baru ulangi langkah 2-5)
+```
+
+---
+
+### H. OS lain gak muncul di menu GRUB (dualboot, setelah install selesai)
+
+**PENTING — baca dulu sebelum nyalain os-prober**:
+
+Di Koppie, os-prober **udah aktif dari sononya**. Faktanya dari ISO:
+
+| Komponen | Status di Koppie |
+|---|---|
+| `os-prober` | udah terpasang (`packages.x86_64`) |
+| `GRUB_DISABLE_OS_PROBER` | udah ditulis `"false"` sama modul `grubcfg` Calamares |
+
+Jadi **"GRUB modern nge-disable os-prober" NGGAK berlaku di sini**. Kalau OS kedua tetap gak nongol, masalahnya BUKAN os-prober mati. Cek dua hal ini dulu:
+
+**Kemungkinan 1 — yang keboot GRUB-nya OS kedua, bukan Koppie.**
+
+```bash
+efibootmgr -v          # bootloader mana yang jadi default?
+# kalau entry-nya nunjuk Arch kedua (bukan "KOPPIE"), itu yang keboot duluan.
+# Solusi: masuk BIOS, balikin boot order ke KOPPIE. Atau dari OS kedua:
+#   sudo grub-install --target=x86_64-efi --efi-directory=/boot/efi \
+#        --bootloader-id=KOPPIE --recheck
+```
+
+**Kemungkinan 2 — grub-mkconfig terakhir jalan dari OS LAIN** (os-prober-nya masih default/off di sana), jadi `/boot/grub/grub.cfg` kepenuhan config OS itu dan entry Koppie/OS lain ilang. Fix-nya: **regenerate dari Koppie** (partition yang megang GRUB).
+
+```bash
+# dari Koppie, root mount di /
+grep -n GRUB_DISABLE_OS_PROBER /etc/default/grub
+# harusnya udah "false". Kalau belum, tambahin SEKALI (idempoten):
+grep -q '^GRUB_DISABLE_OS_PROBER=false' /etc/default/grub \
+  || echo 'GRUB_DISABLE_OS_PROBER=false' | sudo tee -a /etc/default/grub
+
+sudo os-prober                  # tes deteksi — harusnya muncul daftar OS lain
+sudo grub-mkconfig -o /boot/grub/grub.cfg
+grep -n menuentry /boot/grub/grub.cfg | head   # entry OS lain harus kecantum
+```
+
+**Kalau `os-prober` kosong tapi OS-nya emang ada**: partisi OS lain gak ke-mount waktu `grub-mkconfig` jalan. Mount manual dulu (`sudo mount /dev/sdXY /mnt/os`), ulangi dari atas.
+
+> `echo ... | tee -a` bisa nambah baris dobel kalau dijalankan 2x — makanya dibungkus `grep -q ... ||` biar cuma nulis kalau belum ada.
+
+---
+
 ## 4. Urutan modul Calamares (biar tau tahap mana yang gagal)
 
 ```
