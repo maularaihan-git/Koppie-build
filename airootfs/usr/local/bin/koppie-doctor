@@ -92,24 +92,36 @@ fix_grub() {
         warn "os-prober belum ada — install dulu: sudo pacman -S os-prober"
     fi
 
-    # 2. Pastikan os-prober aktif (idempoten — gak nulis dobel).
-    if grep -q '^GRUB_DISABLE_OS_PROBER=false' /etc/default/grub 2>/dev/null; then
+    # 2. Pastikan os-prober aktif (idempoten — uncomment, bukan append dobel).
+    #    GRUB 2.16 MENGE-HARDCODE GRUB_DISABLE_OS_PROBER="true" di
+    #    /usr/sbin/grub-mkconfig, jadi walau paket os-prober kepasang, dia
+    #    gak bakal jalan kalau baris di /etc/default/grub masih ke-comment.
+    local gdef=/etc/default/grub
+    if grep -q '^GRUB_DISABLE_OS_PROBER=false' "$gdef" 2>/dev/null; then
         ok "GRUB_DISABLE_OS_PROBER=false udah aktif."
+    elif grep -q '^#GRUB_DISABLE_OS_PROBER=false' "$gdef" 2>/dev/null; then
+        say "Uncomment GRUB_DISABLE_OS_PROBER=false di $gdef..."
+        sudo sed -i 's|^#GRUB_DISABLE_OS_PROBER=false|GRUB_DISABLE_OS_PROBER=false|' "$gdef"
+        ok "Diaktifkan (uncomment)."
     else
-        say "Aktifkan os-prober di /etc/default/grub..."
-        echo 'GRUB_DISABLE_OS_PROBER=false' | sudo tee -a /etc/default/grub >/dev/null
-        ok "Diaktifkan."
+        say "Tambah GRUB_DISABLE_OS_PROBER=false ke $gdef..."
+        echo 'GRUB_DISABLE_OS_PROBER=false' | sudo tee -a "$gdef" >/dev/null
+        ok "Diaktifkan (append)."
     fi
 
     # 3. Tes deteksi OS lain.
-    say "Jalanin os-prober (bisa agak lama)..."
+    #    PENTING: os-prober bisa LAMBAT (>60 dtk) di hardware lama / banyak
+    #    partisi. Kalau kepotong timeout, outputnya kosong = FALSE NEGATIVE
+    #    (kelihatan "gak ke-detek" padahal cuma belum selesai scan).
+    say "Jalanin os-prober — bisa LAMA (>1 menit) di hardware lama, sabar..."
     local hasil
-    hasil=$(sudo os-prober 2>/dev/null)
+    hasil=$(sudo timeout 300 os-prober 2>/dev/null)
     if [ -n "$hasil" ]; then
         ok "OS lain ke-detek:"
         echo "$hasil" | sed 's/^/        /'
     else
         warn "Gak ada OS lain ke-detek. Kalau yakin harusnya ada:"
+        warn "  - os-prober mungkin kepotong: coba 'sudo timeout 300 os-prober' manual"
         warn "  - pastiin partisi OS itu ke-mount, lalu ulangi"
         warn "  - atau cek 'efibootmgr -v' (boot order ke Koppie apa enggak)"
     fi

@@ -37,3 +37,22 @@ done
 sed -i 's|^background=.*|background=/usr/share/wallpapers/Koppie/contents/Images_dark/5120x2880.png|' \
     /usr/share/sddm/themes/breeze/theme.conf
 
+# 6. AKTIFKAN os-prober di /etc/default/grub (fix dualboot).
+#    GRUB 2.16 MENGE-HARDCODE GRUB_DISABLE_OS_PROBER="true" di dalam
+#    /usr/sbin/grub-mkconfig, jadi os-prober gak PERNAH jalan walau
+#    paketnya kepasang. Satu-satunya cara ngalahin: uncomment baris
+#    GRUB_DISABLE_OS_PROBER=false di /etc/default/grub target.
+#    Kenapa di sini (chroot customize_airootfs) dan bukan di airootfs/?
+#    karena /etc/default/grub dimiliki paket 'grub' — taruh langsung di
+#    airootfs/ kena error "exists in filesystem" pas pacstrap.
+#    Modul grubcfg Calamares CUMA nulis GRUB_DISTRIBUTOR, dia gak nyentuh
+#    baris ini, jadi harus dibake di sini biar tiap install auto ke-detek.
+GRUB_DEFAULT_FILE=/etc/default/grub
+if [ -f "$GRUB_DEFAULT_FILE" ]; then
+    if grep -q '^#GRUB_DISABLE_OS_PROBER=false' "$GRUB_DEFAULT_FILE"; then
+        sed -i 's|^#GRUB_DISABLE_OS_PROBER=false|GRUB_DISABLE_OS_PROBER=false|' "$GRUB_DEFAULT_FILE"
+    elif ! grep -q '^GRUB_DISABLE_OS_PROBER=false' "$GRUB_DEFAULT_FILE"; then
+        echo 'GRUB_DISABLE_OS_PROBER=false' >> "$GRUB_DEFAULT_FILE"
+    fi
+fi
+
