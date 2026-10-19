@@ -1,0 +1,53 @@
+#!/bin/bash
+# koppie-lock-clean — bersihin /var/lib/pacman/db.lck yang SISA pas boot.
+#
+# Kenapa perlu: lock itu dibuat pacman CUMA selama transaksi jalan. Kalau file
+# lock ADA tapi gak ada satu pun proses pacman (= kondisi pas boot), berarti
+# peninggalan — biasanya dari Calamares `packages` module yang keputus pas
+# install, atau proses yang mati mendadak (laptop dimatiin, di-cancel paksa).
+# Efeknya klasik: install kelar 100%, abis reboot "error: could not lock
+# database: File exists" padahal gak ada yang jalan.
+#
+# ATURAN AMAN (sama filosofi koppie-doctor, jangan dikorbankan demi otomatis):
+#   * gak ada lock                  -> DIEM (kondisi normal, hampir semua boot)
+#   * ada proses package manager    -> DILEWATI (lock itu MILIK mereka)
+#   * lock baru dibuat (< 60 dtk)   -> DILEWATI (mungkin prosesnya baru mulai)
+# Hapus lock pas pacman beneran jalan bisa korupsi DB, jadi yang RAGU nggak
+# disentuh — manual-nya tetap: sudo koppie-doctor lock
+set -u
+
+LOCK=/var/lib/pacman/db.lck
+
+# Gak ada lock = gak ada masalah. Keluar senyap biar journal gak berisik.
+[ -f "$LOCK" ] || exit 0
+
+# 1) Ada proses package manager hidup? Berarti lock-nya punya mereka.
+#    pgrep -x = nama proses harus match persis; polanya ERE, jadi "a|b" jalan.
+if pgrep -x 'pacman|pamac|pamac-daemon|yay|paru' >/dev/null 2>&1; then
+    echo "$LOCK ada, tapi ada proses package manager yang jalan — DILEWATI."
+    pgrep -x -a 'pacman|pamac|pamac-daemon|yay|paru' | sed 's/^/    /'
+    exit 0
+fi
+
+# 2) Lock-nya kebuatan DETIK INI? Bisa jadi pacman baru mau mulai (race kecil
+#    pas boot). Umur negatif = mtime di masa depan = clock konyol, bukan lock
+#    "baru", jadi tetap dianggap lock lama.
+NOW=$(date +%s)
+MT=$(stat -c %Y "$LOCK" 2>/dev/null) || MT=0
+AGE=$(( NOW - MT ))
+if [ "$AGE" -ge 0 ] && [ "$AGE" -lt 60 ]; then
+    echo "$LOCK baru dibuat ${AGE} dtk lalu — DILEWATI (kemungkinan transaksi baru jalan)."
+    exit 0
+fi
+
+# 3) Aman: lock-nya lama dan gak punya pemilik. Hapus.
+echo "Lock sisa ketemu: $LOCK"
+echo "    umur    : $(( AGE / 60 )) menit (dibuat $(stat -c '%y' "$LOCK" 2>/dev/null))"
+echo "    pemilik : gak ada proses package manager"
+if rm -f "$LOCK"; then
+    echo "OK: lock dihapus — pacman harusnya normal lagi."
+    echo "    (kalau masih error juga: sudo koppie-doctor lock)"
+else
+    echo "GAGAL hapus lock — jalankan manual: sudo $0"
+    exit 1
+fi

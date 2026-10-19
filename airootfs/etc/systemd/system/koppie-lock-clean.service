@@ -1,0 +1,16 @@
+[Unit]
+Description=Bersihkan db.lck sisa pacman (stale lock) pas boot
+Documentation=file:///usr/local/bin/koppie-lock-clean
+# butuh rootfs ke-mount dulu, dan beres SEBELUM user bisa buka terminal
+After=local-fs.target
+Before=display-manager.service
+# cuma jalan kalau ADA lock — boot normal gak bikin unit ini (gak ada noise)
+ConditionPathExists=/var/lib/pacman/db.lck
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/koppie-lock-clean
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

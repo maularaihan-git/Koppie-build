@@ -336,6 +336,29 @@ if [ -n "$MNT" ] && sudo mountpoint -q "$MNT" 2>/dev/null; then
         else
             warn "gak bisa extract modul kernel dari sfs"
         fi
+
+        # 5i. db.lck KEBAWA di sfs — ini penyebab "could not lock database"
+        #     abis install 100%. Lock pacman cuma ada SELAMA transaksi; kalau
+        #     nyangkut di ISO berarti build keputus pas pacstrap / ke-copy dari
+        #     work/airootfs, dan unpackfs bakal nyalain ke sistem hasil install.
+        LCK=$(sqlist -c "/var/lib/pacman/db.lck$"); LCK=${LCK:-0}
+        if [ "$LCK" -gt 0 ]; then
+            bad "ADA /var/lib/pacman/db.lck di dalam sfs ($LCK entry) — lock kebawa ke sistem hasil install"
+            echo "       -> jangan dibakar. Bersihkan dulu:"
+            echo "          sudo rm -f work/airootfs/var/lib/pacman/db.lck"
+            echo "          (atau kalau work/ udah dihapus: rebuild ISO dari nol)"
+        else
+            ok "tidak ada db.lck sisa di sfs (pacman gak bakal ke-lock abis install)"
+        fi
+
+        # 5i2. proteksi first-boot harus ikut ke-bake di ISO (fallback kalau
+        #      5i kelewat — unit ini hapus lock stale pas boot pertama).
+        UNITC=$(sqlist -c "/etc/systemd/system/multi-user.target.wants/koppie-lock-clean.service$")
+        if [ "${UNITC:-0}" -gt 0 ] 2>/dev/null; then
+            ok "unit koppie-lock-clean aktif (auto-bersihin db.lck sisa pas boot)"
+        else
+            warn "unit koppie-lock-clean tidak ada di ISO — gak ada auto-cleanup lock"
+        fi
     fi
     sudo umount "$MNT" 2>/dev/null
 else

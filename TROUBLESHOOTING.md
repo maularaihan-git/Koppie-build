@@ -304,6 +304,15 @@ sudo pacman -Syuu
 
 > **Note**: Koppie **tidak memakai pamac**, jadi step "hapus lock pamac" tidak diperlukan di sini. Kalau `killall` bilang `no process found`, itu normal — lock-nya emang sisa file, bukan proses hidup.
 
+> **Auto-fix (ISO build baru)**: sekarang ada unit `koppie-lock-clean.service` yang
+> jalan tiap boot — kalau nemu `db.lck` sisa **dan** gak ada proses pacman yang punya,
+> lock-nya dihapus otomatis sebelum SDDM nyala. Lognya:
+> `journalctl -u koppie-lock-clean -b`. Lock yang **kebawa dari ISO** juga ketahuan
+> duluan: `./verify-iso.sh` sekarang FAIL (check 5i) kalau ada `db.lck` di dalam sfs,
+> jadi ISO-nya nggak kepakai sebelum dibakar.
+> Tapi kalau lock-nya **muncul setelah boot** (berarti transaksi kamu yang putus),
+> unit itu gak ngefek — tetap pakai langkah di atas atau `sudo koppie-doctor lock`.
+
 ---
 
 ### G. WiFi Broadcom mati (driver DKMS gagal build)
