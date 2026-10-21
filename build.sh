@@ -14,6 +14,12 @@ sudo -n true || { echo "ERROR: sudo minta password, grant dulu"; exit 1; }
 echo "=== [2/3] build ISO (sleep DISABLE selama build) ==="
 LOG="build-$(date +%Y%m%d-%H%M%S).log"
 echo "log lengkap: $LOG"
+# Bersihkan db.lck kalau ada sisa di work sebelum lanjut
+if [ -f work/airootfs/var/lib/pacman/db.lck ]; then
+    echo "=== membersihkan sisa db.lck di work/airootfs ==="
+    sudo rm -f work/airootfs/var/lib/pacman/db.lck
+fi
+
 rc=0
 sudo systemd-inhibit \
     --what=shutdown:sleep:idle:handle-power-key:handle-suspend-key:handle-hibernate-key:handle-lid-switch \
@@ -32,4 +38,9 @@ if [ "$rc" -ne 0 ]; then
 fi
 
 echo "=== [3/3] SELESAI - inhibit lepas otomatis ==="
+LATEST_ISO=$(ls -t out/*.iso 2>/dev/null | head -1 || true)
+if [ -n "$LATEST_ISO" ] && [ -x ./verify-iso.sh ]; then
+    echo "=== menjalankan verify-iso.sh otomatis ==="
+    ./verify-iso.sh "$LATEST_ISO" || true
+fi
 ls -lh out/ 2>/dev/null | grep -E "iso|sha" || echo "(cek folder out/)"

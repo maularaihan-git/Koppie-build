@@ -30,12 +30,13 @@ if pgrep -x 'pacman|pamac|pamac-daemon|yay|paru' >/dev/null 2>&1; then
 fi
 
 # 2) Lock-nya kebuatan DETIK INI? Bisa jadi pacman baru mau mulai (race kecil
-#    pas boot). Umur negatif = mtime di masa depan = clock konyol, bukan lock
-#    "baru", jadi tetap dianggap lock lama.
+#    pas boot). Tapi kalau sistem baru saja boot (uptime < 120 dtk) dan
+#    tidak ada pacman yang jalan, berarti ini lock bawaan sfs/install, HARUS dihapus.
+UPTIME_SEC=$(awk '{print int($1)}' /proc/uptime 2>/dev/null || echo 999)
 NOW=$(date +%s)
 MT=$(stat -c %Y "$LOCK" 2>/dev/null) || MT=0
 AGE=$(( NOW - MT ))
-if [ "$AGE" -ge 0 ] && [ "$AGE" -lt 60 ]; then
+if [ "$UPTIME_SEC" -ge 120 ] && [ "$AGE" -ge 0 ] && [ "$AGE" -lt 60 ]; then
     echo "$LOCK baru dibuat ${AGE} dtk lalu — DILEWATI (kemungkinan transaksi baru jalan)."
     exit 0
 fi

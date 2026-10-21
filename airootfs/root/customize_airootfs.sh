@@ -56,3 +56,7 @@ if [ -f "$GRUB_DEFAULT_FILE" ]; then
     fi
 fi
 
+# 7. BERSIHKAN db.lck & sync pacman sebelum dipacking ke squashfs (airootfs.sfs)
+#    Jangan sampai sisa transaksi pacstrap terbakar ke ISO!
+rm -f /var/lib/pacman/db.lck
+
