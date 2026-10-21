@@ -39,13 +39,13 @@ INSTALL_DIR="${INSTALL_DIR:-koppie}"
 # kernel version dari nama paket linux-lts di dalam sfs (diisi nanti)
 KVER=""
 
-mkdir -p /tmp/opencode
-MNT=$(mktemp -d /tmp/opencode/isomnt.XXXXXX)
+mkdir -p /tmp/koppie
+MNT=$(mktemp -d /tmp/koppie/isomnt.XXXXXX)
 SQROOT=""
 # daftar isi sfs. JANGAN disimpan di variabel shell: 991.610 baris (~60MB)
 # melebihi ARG_MAX waktu di-echo, jadi grep-nya nggak pernah dapet data.
 # Simpan ke file, lalu grep dari file.
-LISTFILE=$(mktemp /tmp/opencode/sqlist.XXXXXX)
+LISTFILE=$(mktemp /tmp/koppie/sqlist.XXXXXX)
 cleanup() {
     sudo umount "$MNT" 2>/dev/null
     [ -n "${SQROOT:-}" ] && sudo rm -rf "$SQROOT" 2>/dev/null
@@ -307,7 +307,7 @@ if [ -n "$MNT" ] && sudo mountpoint -q "$MNT" 2>/dev/null; then
 
         # 5g. symlink gantung di /boot sfs (bug rsync -a di copytoram)
         echo "       cek symlink gantung di /boot sfs..."
-        RDR=$(mktemp -d /tmp/opencode/sqroot.XXXXXX); SQROOT="$RDR"
+        RDR=$(mktemp -d /tmp/koppie/sqroot.XXXXXX); SQROOT="$RDR"
         if sudo unsquashfs -d "$RDR" "$SFS" boot >/dev/null 2>&1; then
             if sudo find "$RDR/boot" -xtype l 2>/dev/null | grep -q .; then
                 bad "ADA symlink gantung di /boot sfs:"

@@ -5,7 +5,8 @@
 # buat penjelasan bug lama: `kill -0` tanpa sudo -> EPERM -> lock bocor).
 cd ~/Projects/Koppie-Arch || exit 1
 
-INHIBIT_PIDFILE="/tmp/opencode/koppie-inhibit.pid"
+mkdir -p /tmp/koppie
+INHIBIT_PIDFILE="/tmp/koppie/koppie-inhibit.pid"
 
 release_lock() {
     # cuma bunuh lock yang KITA bikin (baca PID dari file + verifikasi comm)

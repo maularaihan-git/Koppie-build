@@ -10,7 +10,8 @@ set -uo pipefail
 cd ~/Projects/Koppie-Arch || exit 1
 
 TIMEOUT_SEC="${1:-21600}"
-INHIBIT_PIDFILE="/tmp/opencode/koppie-inhibit.pid"
+mkdir -p /tmp/koppie
+INHIBIT_PIDFILE="/tmp/koppie/koppie-inhibit.pid"
 
 release_lock() {
     # baca PID dari file -> cuma bunuh lock yang KITA bikin (no false-positive)
