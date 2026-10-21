@@ -39,6 +39,7 @@ INSTALL_DIR="${INSTALL_DIR:-koppie}"
 # kernel version dari nama paket linux-lts di dalam sfs (diisi nanti)
 KVER=""
 
+mkdir -p /tmp/opencode
 MNT=$(mktemp -d /tmp/opencode/isomnt.XXXXXX)
 SQROOT=""
 # daftar isi sfs. JANGAN disimpan di variabel shell: 991.610 baris (~60MB)
