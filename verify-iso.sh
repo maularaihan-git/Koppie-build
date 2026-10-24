@@ -360,6 +360,64 @@ if [ -n "$MNT" ] && sudo mountpoint -q "$MNT" 2>/dev/null; then
         else
             warn "unit koppie-lock-clean tidak ada di ISO — gak ada auto-cleanup lock"
         fi
+
+        # 5j. 100% OFFLINE check: pacman sync DB backup harus ada di ISO.
+        #     customize_airootfs.sh step 8 backup dari /var/lib/pacman/sync/*.db
+        #     ke /usr/share/koppie/pacman-sync/. Calamares shellprocess restore-nya
+        #     setelah unpackfs, sehingga modul `packages` bisa hapus live-only pakage
+        #     tanpa internet. Kalau DB backup gak ada = packages module gagal = ISO
+        #     akan menyisakan calamares/archiso/mkinitcpio-archiso di sistem hasil install.
+        SYNCDB=$(sqlist -c "usr/share/koppie/pacman-sync/core.db\|usr/share/koppie/pacman-sync/extra.db")
+        if [ "${SYNCDB:-0}" -gt 0 ] 2>/dev/null; then
+            ok "pacman sync DB backup ada di ISO (offline Calamares 100% siap)"
+            sqlist "usr/share/koppie/pacman-sync/" | sed 's/^/       /'
+        else
+            bad "pacman sync DB backup TIDAK ADA di sfs — modul packages Calamares bakal gagal offline"
+            echo "       -> rebuild: pastikan customize_airootfs.sh step 8 berjalan"
+        fi
+
+        # 5k. Calamares standalone config & urutan sequence check
+        CSET=$(sqget etc/calamares/settings.conf)
+        if [ -n "$CSET" ]; then
+            ok "Calamares settings.conf ada di ISO"
+            # Cek urutan unpackfs -> grubcfg -> bootloader di bagian exec:
+            EXEC_SEQ=$(echo "$CSET" | sed -n '/- exec:/,/- show:\|- fail:/p')
+            UNP_LINE=$(echo "$EXEC_SEQ" | grep -n -- "- unpackfs" | cut -d: -f1 | head -1)
+            GRUB_LINE=$(echo "$EXEC_SEQ" | grep -n -- "- grubcfg" | cut -d: -f1 | head -1)
+            BOOT_LINE=$(echo "$EXEC_SEQ" | grep -n -- "- bootloader" | cut -d: -f1 | head -1)
+
+            if [ -n "$UNP_LINE" ] && [ -n "$GRUB_LINE" ] && [ -n "$BOOT_LINE" ] && \
+               [ "$UNP_LINE" -lt "$BOOT_LINE" ] && [ "$GRUB_LINE" -lt "$BOOT_LINE" ]; then
+                ok "urutan Calamares exec valid (unpackfs:$UNP_LINE -> grubcfg:$GRUB_LINE -> bootloader:$BOOT_LINE)"
+            else
+                bad "urutan Calamares exec SALAH (unpackfs:$UNP_LINE, grubcfg:$GRUB_LINE, bootloader:$BOOT_LINE) — bootloader harus sesudah unpackfs & grubcfg"
+            fi
+        else
+            bad "Calamares settings.conf TIDAK ADA di ISO"
+        fi
+
+        # 5l. Dual-boot & Multi-boot safety check (cegah partisi OS lain terhapus / bootloader tertimpa)
+        CPART=$(sqget etc/calamares/modules/partition.conf)
+        CBOOT=$(sqget etc/calamares/modules/bootloader.conf)
+        CGRUB=$(sqget etc/calamares/modules/grubcfg.conf)
+
+        if echo "$CPART" | grep -q "initialPartitioningChoice: none"; then
+            ok "partition.conf: initialPartitioningChoice=none (aman dualboot, tidak auto-wipe)"
+        else
+            warn "partition.conf tidak set initialPartitioningChoice=none (rawan terformat default)"
+        fi
+
+        if echo "$CBOOT" | grep -q 'efiBootloaderId: "koppie"'; then
+            ok "bootloader.conf: efiBootloaderId=koppie (EFI terisolasi di /boot/efi/EFI/koppie/)"
+        else
+            warn "bootloader.conf: efiBootloaderId belum diset 'koppie' secara eksplisit"
+        fi
+
+        if echo "$CGRUB" | grep -q 'GRUB_DISABLE_OS_PROBER: "false"'; then
+            ok "grubcfg.conf: GRUB_DISABLE_OS_PROBER=false (menu dualboot Windows/Linux aktif)"
+        else
+            bad "grubcfg.conf: os-prober TIDAK AKTIF — OS lain gak bakal muncul di menu GRUB"
+        fi
     fi
     sudo umount "$MNT" 2>/dev/null
 else

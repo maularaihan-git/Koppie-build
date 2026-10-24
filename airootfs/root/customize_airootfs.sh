@@ -56,7 +56,39 @@ if [ -f "$GRUB_DEFAULT_FILE" ]; then
     fi
 fi
 
+# 6b. FIX KERNEL PANIC OS LAIN DI DUAL-BOOT:
+#     Bug legendaris os-prober: kalau distro Linux lain punya CPU microcode (intel-ucode/amd-ucode)
+#     bersama initramfs, os-prober 40grub2 cuma membaca argumen $2 (ucode) dan MEMBUANG $3 (initramfs utama).
+#     Akibatnya saat OS lain di-boot dari menu GRUB, sistem boot tanpa driver filesystem -> KERNEL PANIC!
+#     Patch ini memastikan SEMUA argumen initrd dipertahankan (${@:2}).
+for pfile in /usr/lib/linux-boot-probes/mounted/common/40grub2 /usr/lib/linux-boot-probes/mounted/40grub2; do
+    if [ -f "$pfile" ]; then
+        sed -i 's|initrd="\$(echo "\$2"|initrd="\$(echo "\${@:2}"|g' "$pfile" 2>/dev/null || true
+    fi
+done
+
+# 6c. FIX LINITRD di /etc/grub.d/30_os-prober untuk partisi /boot terpisah:
+#     ${LINITRD#/boot} cuma hapus prefix /boot dari file pertama. Jika ada microcode + initramfs,
+#     file kedua masih diawali /boot/ dan tidak ditemukan di boot partition -> KERNEL PANIC.
+if [ -f /etc/grub.d/30_os-prober ]; then
+    sed -i 's|LINITRD="\${LINITRD#/boot}"|LINITRD="$(echo "\${LINITRD}" \| sed "s\|/boot/\|/\|g")"|' /etc/grub.d/30_os-prober 2>/dev/null || true
+fi
+
 # 7. BERSIHKAN db.lck & sync pacman sebelum dipacking ke squashfs (airootfs.sfs)
 #    Jangan sampai sisa transaksi pacstrap terbakar ke ISO!
 rm -f /var/lib/pacman/db.lck
 
+# 8. BACKUP pacman sync DB ke /usr/share/koppie/pacman-sync (WAJIB untuk 100% OFFLINE).
+#    mkarchiso _cleanup_pacstrap_dir akan hapus /var/lib/pacman/sync/* sebelum squash.
+#    Calamares shellprocess.conf akan restore DB ini setelah unpackfs, sehingga modul
+#    `packages` (yang hapus calamares, mkinitcpio-archiso, dll) bisa jalan tanpa internet.
+#    Kita backup sekarang (setelah pacstrap selesai) sebelum cleanup terjadi.
+SYNC_SRC=/var/lib/pacman/sync
+SYNC_DST=/usr/share/koppie/pacman-sync
+if [ -d "$SYNC_SRC" ] && [ "$(ls -A "$SYNC_SRC"/*.db 2>/dev/null)" ]; then
+    mkdir -p "$SYNC_DST"
+    cp -a "$SYNC_SRC"/*.db "$SYNC_DST"/
+    echo "Backed up pacman sync DBs: $(ls "$SYNC_DST")"
+else
+    echo "WARNING: No pacman sync DBs found at $SYNC_SRC — offline pacman won't work"
+fi

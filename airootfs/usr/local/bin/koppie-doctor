@@ -69,8 +69,12 @@ fix_lock() {
     if sudo pacman -Syuu; then
         ok "Pacman normal lagi. Selesai."
     else
-        bad "pacman -Syuu masih gagal — cek output di atas."
-        return 1
+        warn "pacman -Syuu gagal (kemungkinan offline). Restore DB lokal dari backup..."
+        if [ -d /usr/share/koppie/pacman-sync ]; then
+            sudo cp -a /usr/share/koppie/pacman-sync/*.db /var/lib/pacman/sync/ 2>/dev/null || true
+            ok "DB lokal dikembalikan dari backup (/usr/share/koppie/pacman-sync)."
+        fi
+        say "Silakan coba pacman lagi setelah terhubung ke internet."
     fi
 }
 

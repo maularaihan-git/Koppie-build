@@ -94,7 +94,6 @@ upower
 udisks2
 polkit
 calamares
-calamares-config-koppie
 squashfs-tools
 gptfdisk
 dbus
@@ -127,3 +126,4 @@ foomatic-db-engine
 splix
 qt5ct
 qt6ct
+

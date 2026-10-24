@@ -29,3 +29,10 @@ systemctl disable koppie-live-user.service
 if [ -e /run/archiso/copytoram/airootfs.sfs ] && [ -e /run/archiso/bootmnt/koppie/boot/x86_64/vmlinuz-linux-lts ]; then
     cp /run/archiso/bootmnt/koppie/boot/x86_64/vmlinuz-linux-lts /run/archiso/copytoram/vmlinuz-linux-lts 2>/dev/null || true
 fi
+
+# Restore pacman sync DB agar di mode live ISO user/KDM/KUM bisa langsung pacman -S tanpa -Sy dulu
+if [ -d /usr/share/koppie/pacman-sync ] && [ -n "$(ls -A /usr/share/koppie/pacman-sync/*.db 2>/dev/null)" ]; then
+    mkdir -p /var/lib/pacman/sync
+    cp -a /usr/share/koppie/pacman-sync/*.db /var/lib/pacman/sync/ 2>/dev/null || true
+fi
+
