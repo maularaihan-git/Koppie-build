@@ -92,3 +92,17 @@ if [ -d "$SYNC_SRC" ] && [ "$(ls -A "$SYNC_SRC"/*.db 2>/dev/null)" ]; then
 else
     echo "WARNING: No pacman sync DBs found at $SYNC_SRC — offline pacman won't work"
 fi
+
+# 9. PASTIKAN repo [koppie] online ada di /etc/pacman.conf ISO & sistem terinstall
+#    Biar kalau user konek WiFi/internet, bisa langsung install/update paket dari repo Koppie (seperti repo core/extra).
+if ! grep -q '^\[koppie\]' /etc/pacman.conf; then
+    cat << 'EOF' >> /etc/pacman.conf
+
+# Koppie Linux - Official Online Repository
+[koppie]
+SigLevel = Optional TrustAll
+Server = https://github.com/maularaihan-git/koppie-repo/releases/download/koppie-v1
+Server = https://raw.githubusercontent.com/maularaihan-git/koppie-repo/main/x86_64
+EOF
+    echo "Added [koppie] online repository to /etc/pacman.conf"
+fi

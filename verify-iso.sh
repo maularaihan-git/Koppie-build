@@ -418,6 +418,19 @@ if [ -n "$MNT" ] && sudo mountpoint -q "$MNT" 2>/dev/null; then
         else
             bad "grubcfg.conf: os-prober TIDAK AKTIF — OS lain gak bakal muncul di menu GRUB"
         fi
+
+        # 5m. Online [koppie] repo check di /etc/pacman.conf ISO
+        PC=$(sqget etc/pacman.conf)
+        if echo "$PC" | grep -q '^\[koppie\]'; then
+            ok "repo [koppie] terdaftar di /etc/pacman.conf ISO"
+            if echo "$PC" | grep -A3 '^\[koppie\]' | grep -q 'https://'; then
+                ok "repo [koppie] mengarah ke HTTPS online (GitHub) — siap download via WiFi"
+            else
+                warn "repo [koppie] belum mengarah ke HTTPS online"
+            fi
+        else
+            bad "repo [koppie] TIDAK ADA di /etc/pacman.conf ISO — user tidak bisa download dari repo koppie"
+        fi
     fi
     sudo umount "$MNT" 2>/dev/null
 else
